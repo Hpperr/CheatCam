@@ -1,4 +1,4 @@
-# CHEATCAM v4.0
+# CHEATCAM v6.0
 
 ## IP Camera Security Testing Framework
 
